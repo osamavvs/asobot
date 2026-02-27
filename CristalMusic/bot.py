@@ -1,14 +1,15 @@
 import asyncio
+import pyrogram.errors
+
+# حيلة برمجية لتجاوز خطأ الإصدارات
+if not hasattr(pyrogram.errors, "GroupcallForbidden"):
+    pyrogram.errors.GroupcallForbidden = type("GroupcallForbidden", (Exception,), {})
+
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
-from pytgcalls.types import MediaStream  # التغيير هنا
+from pytgcalls.types import MediaStream
 from yt_dlp import YoutubeDL
 from config import API_ID, API_HASH, BOT_TOKEN
-
-# تعريف البوت والمساعد
-app = Client("CristalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-call_py = PyTgCalls(app)
-
 # إعدادات البحث في يوتيوب
 ytdl_opts = {"format": "bestaudio/best", "quiet": True}
 ytdl = YoutubeDL(ytdl_opts)
