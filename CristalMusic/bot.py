@@ -5,12 +5,13 @@ import os
 import time
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import UserNotParticipant
 from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream
 from youtubesearchpython import VideosSearch
 from config import API_ID, API_HASH, BOT_TOKEN
 
-# --- الإعدادات ---
+# --- الإعدادات الأساسية ---
 OWNER_ID = 8074717568 
 OWNER_USER = "U_K44"
 CHANNEL_USER = "BBABB9"
@@ -19,111 +20,129 @@ START_IMG = "https://telegra.ph/file/07f43f11f568a91439d5b.jpg"
 app = Client("CristalMusic", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
-# قاعدة بيانات الإحصائيات
+# --- نظام قواعد البيانات البسيط ---
 STATS_FILE = "stats.json"
-def load_stats():
-    if not os.path.exists(STATS_FILE): return {"users": [], "groups": []}
-    with open(STATS_FILE, "r") as f: return json.load(f)
+BANNED_FILE = "banned.json"
 
-# --- ميزة الـ Ping (السرعة) ---
-@app.on_message(filters.regex("^بنج$|^ping$"))
-async def ping_bot(client, message):
-    start = time.time()
-    m = await message.reply_text("🚀 جاري فحص السرعة...")
-    end = time.time()
-    resp = round((end - start) * 1000)
-    await m.edit(f"📶 **سرعة استجابة البوت:** `{resp}ms`\n💎 **الحالة:** ممتاز")
+def load_data(file, default):
+    if not os.path.exists(file): return default
+    with open(file, "r") as f:
+        try: return json.load(f)
+        except: return default
 
-# --- ميزة الإذاعة (للمطور فقط) ---
-@app.on_message(filters.regex("^اذاعة$") & filters.user(OWNER_ID) & filters.reply)
-async def broadcast(client, message):
-    stats = load_stats()
-    all_targets = stats["users"] + stats["groups"]
-    sent = 0
-    m = await message.reply_text(f"📢 جاري الإذاعة إلى `{len(all_targets)}` مكان...")
-    
-    for target in all_targets:
-        try:
-            await message.reply_to_message.copy(int(target))
-            sent += 1
-            await asyncio.sleep(0.3) # تجنب الحظر
-        except: pass
-    
-    await m.edit(f"✅ **تمت الإذاعة بنجاح!**\nوصلت الرسالة لـ `{sent}` مستخدم ومجموعة.")
+def save_data(file, data):
+    with open(file, "w") as f: json.dump(data, f)
 
-# --- ميزة كلمات الأغاني (Lyrics) ---
-@app.on_message(filters.regex(r"^كلمات\s+(.*)"))
-async def lyrics_search(client, message):
-    query = message.matches[0].group(1)
-    m = await message.reply_text("🔎 جاري البحث عن الكلمات...")
-    # ملاحظة: يمكنك استخدام مكتبة lyricsgenius هنا، لكننا سنستخدم البحث البسيط
-    await m.edit(f"⚠️ ميزة الكلمات قيد التطوير، ابحث عن `{query}` في قنواتنا حالياً: @{CHANNEL_USER}")
+stats = load_data(STATS_FILE, {"users": [], "groups": []})
+banned_users = load_data(BANNED_FILE, [])
 
-# --- ميزة معلومات الدردشة (الأيدي) ---
-@app.on_message(filters.regex("^ايدي$"))
-async def get_id(client, message):
+# --- وظائف المساعدة ---
+async def check_subscribe(client, message):
+    try:
+        await client.get_chat_member(CHANNEL_USER, message.from_user.id)
+    except UserNotParticipant:
+        await message.reply_text(
+            f"⚠️ **عذراً عزيزي، عليك الاشتراك في القناة أولاً:**\n👉 @{CHANNEL_USER}",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("اضغط هنا للاشتراك 📢", url=f"https://t.me/{CHANNEL_USER}")]])
+        )
+        return False
+    except: return True
+    return True
+
+# --- أوامر المطور (التحكم والحظر) ---
+@app.on_message(filters.regex("^التحكم$") & filters.user(OWNER_ID))
+async def admin_panel(client, message):
+    u_count, g_count, b_count = len(stats["users"]), len(stats["groups"]), len(banned_users)
     await message.reply_text(
-        f"📌 **أيدي الدردشة:** `{message.chat.id}`\n"
-        f"👤 **أيديك:** `{message.from_user.id}`"
+        f"📊 **لوحة تحكم المطور Cristal**\n\n"
+        f"👥 **المستخدمين:** `{u_count}`\n"
+        f"🏘 **المجموعات:** `{g_count}`\n"
+        f"🚫 **المحظورين:** `{b_count}`\n\n"
+        "**الأوامر:**\n"
+        "• `حظر + الايدي`\n"
+        "• `الغاء حظر + الايدي`\n"
+        "• `اذاعة` (بالرد على رسالة)",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 تحديث", callback_data="refresh_stats")]])
     )
 
-# --- ميزة رابط الحذف (تنظيف التليجرام) ---
-@app.on_message(filters.regex("^رابط الحذف$"))
-async def del_link(client, message):
-    await message.reply_text(
-        "👋 **وداعاً؟ إليك روابط حذف الحساب:**\n\n"
-        "🌐 [الموقع الرسمي](https://my.telegram.org/auth?to=delete)\n"
-        "🤖 [بوت الحذف](https://t.me/LC_96BOT)",
-        disable_web_page_preview=True
-    )
+@app.on_message(filters.regex(r"^حظر (\d+)") & filters.user(OWNER_ID))
+async def ban_handler(client, message):
+    user_id = int(message.matches[0].group(1))
+    if user_id not in banned_users:
+        banned_users.append(user_id)
+        save_data(BANNED_FILE, banned_users)
+        await message.reply_text(f"✅ تم حظر `{user_id}`")
 
-# --- التعديلات على نظام التشغيل (المغادرة التلقائية) ---
-@call_py.on_update()
-async def auto_leave_handler(client, update):
-    # إذا انتهى الصوت أو خرج الجميع، يغادر البوت لتوفير الطاقة
-    pass # يتم تفعيلها تلقائياً عبر مكتبة pytgcalls
+# --- أوامر المجموعات (الاوامر، المطور، السورس) ---
+@app.on_message(filters.regex("^الاوامر$") & filters.group)
+async def group_cmds(client, message):
+    await message.reply_text("✨ **أوامر التشغيل:**\n• شغل + اسم الاغنية\n• ايقاف، مؤقت، استئناف، تخطي")
 
-# --- القائمة الرئيسية المحدثة ---
+@app.on_message(filters.regex("^المطور$") & filters.group)
+async def dev_info(client, message):
+    await message.reply_text(f"👤 **المطور:** @{OWNER_USER}")
+
+@app.on_message(filters.regex("^السورس$") & filters.group)
+async def source_info(client, message):
+    await message.reply_text(f"📥 **السورس:** @{CHANNEL_USER}")
+
+# --- رسالة Start في الخاص ---
 @app.on_message(filters.command("start") & filters.private)
-async def start_new(client, message):
-    # تسجيل المستخدم في الإحصائيات
-    st = load_stats()
-    if str(message.from_user.id) not in st["users"]:
-        st["users"].append(str(message.from_user.id))
-        with open(STATS_FILE, "w") as f: json.dump(st, f)
-
+async def start_private(client, message):
+    if not await check_subscribe(client, message): return
+    if str(message.from_user.id) not in stats["users"]:
+        stats["users"].append(str(message.from_user.id))
+        save_data(STATS_FILE, stats)
+    
     await message.reply_photo(
         photo=START_IMG,
-        caption=(f"🔥 **أهلاً بك في أقوى بوت ميوزك**\n\n"
-                 f"• أسرع استجابة (Ping)\n"
-                 f"• جودة صوت فائقة\n"
-                 f"• حماية كاملة من الحظر\n\n"
-                 f"💡 أرسل `الاوامر` لترى قائمة التحكم."),
+        caption=f"👋 **أهلاً بك {message.from_user.mention} في بوت كرستال**\n\n📌 أرسل `الاوامر` لمعرفة كيفية التشغيل.",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎵 إضافة البوت لمجموعتك", url=f"https://t.me/{(await client.get_me()).username}?startgroup=true")],
-            [InlineKeyboardButton("📊 التحكم", callback_data="admin_panel"), InlineKeyboardButton("📡 السورس", url=f"https://t.me/{CHANNEL_USER}")],
-            [InlineKeyboardButton("🛠 الدعم الفني", url=f"https://t.me/{OWNER_USER}")]
+            [InlineKeyboardButton("🎵 أضفني لمجموعتك", url=f"https://t.me/{(await client.get_me()).username}?startgroup=true")],
+            [InlineKeyboardButton("👤 المطور", url=f"https://t.me/{OWNER_USER}"), InlineKeyboardButton("📢 القناة", url=f"https://t.me/{CHANNEL_USER}")]
         ])
     )
 
-# --- كود التشغيل الأساسي (البحث السريع) ---
-@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)\s+(.*)"))
-async def play_audio(client, message):
-    # (نفس الكود السابق مع إضافة تسجيل المجموعات في الإحصائيات)
-    st = load_stats()
-    if str(message.chat.id) not in st["groups"]:
-        st["groups"].append(str(message.chat.id))
-        with open(STATS_FILE, "w") as f: json.dump(st, f)
-    
-    query = message.matches[0].group(2)
-    m = await message.reply_text("🎸 **جاري سحب الأغنية...**")
-    # ... بقية منطق التشغيل ...
-    await m.edit("✅ تم التشغيل!")
+# --- نظام التشغيل (مع الطابور والاستقرار) ---
+queue = {}
 
+@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)\s+(.*)"))
+async def play_handler(client, message):
+    if message.from_user.id in banned_users: return await message.reply("🚫 أنت محظور.")
+    if not await check_subscribe(client, message): return
+    
+    # تسجيل المجموعة
+    if str(message.chat.id) not in stats["groups"]:
+        stats["groups"].append(str(message.chat.id))
+        save_data(STATS_FILE, stats)
+
+    query = message.matches[0].group(2)
+    chat_id = message.chat.id
+    m = await message.reply_text("🔎 **جاري البحث...**")
+
+    try:
+        search = VideosSearch(query, limit=1).result()['result'][0]
+        title, url, thumb = search['title'], search['link'], search['thumbnails'][0]['url']
+        
+        with yt_dlp.YoutubeDL({"format": "bestaudio[ext=m4a]", "quiet": True}) as ydl:
+            audio_url = ydl.extract_info(url, download=False)['url']
+
+        if chat_id in queue and len(queue[chat_id]) > 0:
+            queue[chat_id].append({"title": title, "url": audio_url})
+            return await m.edit(f"📝 **تمت الإضافة:** {title}")
+
+        await call_py.join_group_call(chat_id, MediaStream(audio_url))
+        queue[chat_id] = [{"title": title, "url": audio_url}]
+        await m.delete()
+        await message.reply_photo(photo=thumb, caption=f"✅ **بدأ التشغيل:**\n`{title}`",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⏹ إيقاف", callback_data="stop")]]))
+    except Exception as e: await m.edit(f"❌ خطأ: {e}")
+
+# --- التشغيل الرئيسي ---
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 البوت المطور يعمل الآن بكافة الميزات!")
+    print("💎 Cristal Music Online!")
     from pyrogram import idle
     await idle()
 
