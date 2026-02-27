@@ -10,10 +10,16 @@ from config import API_ID, API_HASH, BOT_TOKEN
 app = Client("CristalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
-# إعدادات البحث
-ytdl_opts = {"format": "bestaudio/best", "quiet": True}
+# إعدادات البحث المتقدمة لتجاوز حماية يوتيوب
+ytdl_opts = {
+    "format": "bestaudio/best",
+    "quiet": True,
+    "no_warnings": True,
+    "default_search": "ytsearch",
+    "source_address": "0.0.0.0", # يساعد في تجنب حظر الآي بي على هيروكو
+    "nocheckcertificate": True,
+}
 ytdl = YoutubeDL(ytdl_opts)
-
 # --- قسم الأوامر ---
 @app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
 async def play_audio(client, message):
