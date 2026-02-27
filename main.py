@@ -1,16 +1,11 @@
 import asyncio
 from pyrogram import Client, filters
+from pytgcalls import PyTgCalls
+from pytgcalls.types import AudioPiped
+from pytgcalls.types.stream import StreamAudioQuality
 from youtubesearchpython import VideosSearch
 import yt_dlp
 from config import API_ID, API_HASH, BOT_TOKEN
-
-# الحل النهائي لخطأ ImportError في هيروكو
-try:
-    from pytgcalls import PyTgCalls
-except ImportError:
-    from pytgcalls.pytgcalls import PyTgCalls
-
-from pytgcalls.types import MediaStream
 
 app = Client("CrystalMusic", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call = PyTgCalls(app)
@@ -31,7 +26,7 @@ async def play_handler(_, message):
             
         await call.join_group_call(
             message.chat.id,
-            MediaStream(url)
+            AudioPiped(url, StreamAudioQuality.HIGH)
         )
         await m.edit(f"▶️ تم التشغيل: {search['title']}")
     except Exception as e:
