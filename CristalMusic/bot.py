@@ -8,7 +8,7 @@ from youtubesearchpython import VideosSearch
 from config import API_ID, API_HASH, BOT_TOKEN
 
 # تعريف الكائنات الأساسية
-app = Client("CristalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("CristalMusic", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
 # --- رسالة الترحيب /start ---
@@ -23,19 +23,19 @@ async def start_command(client, message):
         ])
     )
 
-# --- أمر التشغيل (شغل / تشغيل) ---
+# --- أمر التشغيل الرئيسي ---
 @app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
 async def play_audio(client, message):
     query = message.matches[0].group(2)
     m = await message.reply_text(f"🔍 **جاري البحث عن:** `{query}`...")
     
     try:
-        # البحث عن الفيديو وجلب البيانات
+        # البحث وجلب البيانات
         search = VideosSearch(query, limit=1)
         results = search.result()
         
         if not results['result']:
-            return await m.edit("❌ **لم يتم العثور على نتائج للبحث!**")
+            return await m.edit("❌ **لم يتم العثور على نتائج!**")
 
         video_data = results['result'][0]
         url = video_data['link']
@@ -43,10 +43,21 @@ async def play_audio(client, message):
         thumb = video_data['thumbnails'][0]['url']
         duration = video_data['duration']
 
-        # الانضمام للمكالمة وتشغيل الصوت
+        # تشغيل الصوت
         await call_py.join_group_call(message.chat.id, MediaStream(url))
         
-        # حذف رسالة البحث وإرسال الكارت الأنيق مع الأزرار الشفافة
+        # تعريف الأزرار بشكل منفصل لضمان الدقة
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏸ مؤقت", callback_data="pause"),
+                InlineKeyboardButton("▶️ استئناف", callback_data="resume")
+            ],
+            [
+                InlineKeyboardButton("⏹ إيقاف النهائي", callback_data="stop")
+            ]
+        ])
+
+        # حذف رسالة البحث وإرسال الكارت بالأزرار
         await m.delete()
         await message.reply_photo(
             photo=thumb,
@@ -54,33 +65,16 @@ async def play_audio(client, message):
                 "**🎧 تم بدء التشغيل بنجاح**\n\n"
                 f"**📌 العنوان:** `{title}`\n"
                 f"**⏳ المدة:** `{duration}`\n"
-                f"**👤 طلب بواسطة:** {message.from_user.mention}\n\n"
-                "**👇 استخدم الأزرار أدناه للتحكم**"
+                f"**👤 بواسطة:** {message.from_user.mention}\n\n"
+                "**👇 استخدم الأزرار للتحكم:**"
             ),
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("⏸ مؤقت", callback_data="pause"),
-                    InlineKeyboardButton("▶️ استئناف", callback_data="resume")
-                ],
-                [
-                    InlineKeyboardButton("⏹ إيقاف النهائي", callback_data="stop")
-                ]
-            ])
+            reply_markup=buttons
         )
         
     except Exception as e:
         await m.edit(f"❌ **حدث خطأ:** {e}")
 
-# --- أمر الإيقاف النصي ---
-@app.on_message(filters.text & filters.regex(r"^(ايقاف|توقف)$"))
-async def stop_audio_cmd(client, message):
-    try:
-        await call_py.leave_group_call(message.chat.id)
-        await message.reply_text("**✅ تم إيقاف التشغيل بنجاح!**")
-    except:
-        await message.reply_text("❌ **لا يوجد تشغيل نشط حالياً.**")
-
-# --- معالجة ضغطات الأزرار (Callback) ---
+# --- معالجة الضغط على الأزرار ---
 @app.on_callback_query()
 async def handle_buttons(client, query):
     chat_id = query.message.chat.id
@@ -93,13 +87,21 @@ async def handle_buttons(client, query):
     elif query.data == "stop":
         await call_py.leave_group_call(chat_id)
         await query.message.delete()
-        await query.answer("تم إنهاء التشغيل ⏹")
+        await query.answer("تم إيقاف التشغيل ⏹")
 
-# --- وظيفة الإقلاع الرئيسية ---
+# --- أمر إيقاف يدوي نصي ---
+@app.on_message(filters.text & filters.regex(r"^(ايقاف|توقف)$"))
+async def stop_cmd(client, message):
+    try:
+        await call_py.leave_group_call(message.chat.id)
+        await message.reply_text("✅ **تم إيقاف التشغيل.**")
+    except:
+        pass
+
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 Cristal Music Bot is Online!")
+    print("🚀 البوت يعمل الآن والأزرار جاهزة!")
     from pyrogram import idle
     await idle()
 
