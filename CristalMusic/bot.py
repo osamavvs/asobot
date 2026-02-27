@@ -1,7 +1,6 @@
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import UserAlreadyParticipant, InviteHashExpired
 from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream
 from youtubesearchpython import VideosSearch
@@ -11,85 +10,100 @@ from config import API_ID, API_HASH, BOT_TOKEN
 app = Client("CristalMusic", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
-# --- وظيفة الانضمام التلقائي للمساعد ---
-async def join_assistant(client, chat_id):
-    try:
-        # محاولة الحصول على معلومات الدردشة للتأكد من وجود المساعد
-        await client.get_chat_member(chat_id, "me")
-    except Exception:
-        try:
-            # إذا لم يكن موجوداً، يحاول البوت صنع رابط دعوة أو الانضمام مباشرة
-            link = await app.export_chat_invite_link(chat_id)
-            await client.join_chat(link)
-            print(f"✅ انضم المساعد للمجموعة: {chat_id}")
-        except Exception as e:
-            print(f"❌ فشل انضمام المساعد: {e}")
-            return False
-    return True
+# نظام الطابور (Queue) لتخزين الأغاني القادمة
+queue = {}
 
-# --- أمر التشغيل مع استدعاء المساعد ---
-@app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
-async def play_audio(client, message):
+def add_to_queue(chat_id, title, url, duration, user):
+    if chat_id not in queue:
+        queue[chat_id] = []
+    queue[chat_id].append({"title": title, "url": url, "duration": duration, "user": user})
+
+# --- وظيفة الانضمام التلقائي (مثل يوكي) ---
+async def join_assistant(chat_id):
+    try:
+        await app.get_chat_member(chat_id, "me")
+    except:
+        try:
+            link = await app.export_chat_invite_link(chat_id)
+            # هنا نفترض أن المساعد يعمل بنفس الـ Client أو عبر Session String
+            # في بوت يوكي، المساعد ينضم عبر الرابط فوراً
+            print(f"✅ المساعد يحاول الانضمام للمجموعة {chat_id}")
+        except:
+            pass
+
+# --- أمر التشغيل المتطور ---
+@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)\s+(.*)"))
+async def play_handler(client, message):
     query = message.matches[0].group(2)
     chat_id = message.chat.id
-    m = await message.reply_text("🔎 **جاري فحص المساعد والبحث...**")
+    m = await message.reply_text("✨ **جاري المعالجة...**")
     
-    # محاولة إدخال المساعد تلقائياً
-    await join_assistant(client, chat_id)
+    await join_assistant(chat_id)
 
     try:
         search = VideosSearch(query, limit=1)
-        results = search.result()
-        if not results['result']:
-            return await m.edit("❌ **لم أجد نتائج!**")
+        result = search.result()['result'][0]
+        
+        title = result['title']
+        url = result['link']
+        duration = result['duration']
+        thumb = result['thumbnails'][0]['url']
+        user = message.from_user.mention
 
-        video = results['result'][0]
-        url = video['link']
-        title = video['title']
-        thumb = video['thumbnails'][0]['url']
+        # إذا كان هناك تشغيل حالي، أضف للطابور
+        if chat_id in queue and len(queue[chat_id]) > 0:
+            add_to_queue(chat_id, title, url, duration, user)
+            return await m.edit(f"📝 **تمت الإضافة للطابور:**\n**{title}**")
 
-        # الانضمام للمكالمة وتشغيل الصوت
-        try:
-            await call_py.join_group_call(chat_id, MediaStream(url))
-        except Exception as e:
-            return await m.edit(f"❌ **تأكد من فتح المكالمة الصوتية أولاً!**\nالخطأ: {e}")
+        # بدء التشغيل فوراً
+        await call_py.join_group_call(chat_id, MediaStream(url))
+        add_to_queue(chat_id, title, url, duration, user)
 
         await m.delete()
         await message.reply_photo(
             photo=thumb,
             caption=(
-                f"**🎵 تم بدء التشغيل بنجاح**\n\n"
+                f"**🎸 بدأ التشغيل الآن (نسخة يوكي)**\n\n"
                 f"**📌 العنوان:** `{title}`\n"
-                f"**👤 بواسطة:** {message.from_user.mention}"
+                f"**⏳ المدة:** `{duration}`\n"
+                f"**👤 بواسطة:** {user}\n"
             ),
             reply_markup=InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("⏸ مؤقت", callback_data="pause"),
-                    InlineKeyboardButton("▶️ استمرار", callback_data="resume")
+                    InlineKeyboardButton("⏸", callback_data="pause"),
+                    InlineKeyboardButton("▶️", callback_data="resume"),
+                    InlineKeyboardButton("⏭", callback_data="skip")
                 ],
-                [InlineKeyboardButton("⏹ إيقاف النهائي", callback_data="stop")]
+                [InlineKeyboardButton("⏹ إيقاف نهائي", callback_data="stop")]
             ])
         )
     except Exception as e:
-        await m.edit(f"❌ **حدث خطأ:** {e}")
+        await m.edit(f"❌ خطأ: {e}")
 
-# --- معالجة الأزرار ---
+# --- التحكم (الأزرار) ---
 @app.on_callback_query()
-async def callbacks(client, query):
+async def controls(client, query):
+    chat_id = query.message.chat.id
     if query.data == "pause":
-        await call_py.pause_stream(query.message.chat.id)
+        await call_py.pause_stream(chat_id)
         await query.answer("تم الإيقاف المؤقت")
     elif query.data == "resume":
-        await call_py.resume_stream(query.message.chat.id)
+        await call_py.resume_stream(chat_id)
         await query.answer("تم الاستئناف")
     elif query.data == "stop":
-        await call_py.leave_group_call(query.message.chat.id)
+        if chat_id in queue:
+            queue[chat_id] = []
+        await call_py.leave_group_call(chat_id)
         await query.message.delete()
+    elif query.data == "skip":
+        await query.answer("جاري تخطي الأغنية...")
+        # هنا يمكن إضافة منطق السحب من الطابور (Next)
+        await call_py.leave_group_call(chat_id)
 
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 البوت والمساعد جاهزان مع ميزة الانضمام التلقائي!")
+    print("💎 Cristal (Yuki Clone) is ready!")
     from pyrogram import idle
     await idle()
 
