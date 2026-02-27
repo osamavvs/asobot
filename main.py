@@ -1,11 +1,10 @@
 import asyncio
 from pyrogram import Client, filters
+# التعديل البرمجي لحل ImportError
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
-from pytgcalls.types.stream import StreamAudioQuality
+from pytgcalls.types import MediaStream
 from youtubesearchpython import VideosSearch
 import yt_dlp
-from config import API_ID, API_HASH, BOT_TOKEN
 from config import API_ID, API_HASH, BOT_TOKEN
 
 app = Client("CrystalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -26,18 +25,19 @@ async def play(_, message):
             info = ydl.extract_info(link, download=False)
             url = info["url"]
             
+        # استخدام MediaStream للإصدارات الحديثة
         await call.join_group_call(
             message.chat.id,
-            AudioPiped(url, StreamAudioQuality.HIGH)
+            MediaStream(url)
         )
         await m.edit(f"▶️ تم التشغيل: {search['title']}")
     except Exception as e:
         await m.edit(f"❌ خطأ: {e}")
 
-async def start():
+async def start_bot():
     await app.start()
     await call.start()
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(start())
+    asyncio.run(start_bot())
