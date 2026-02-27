@@ -1,1 +1,1 @@
-worker: python3 -m core
+worker: python3 -m CristalMusic
