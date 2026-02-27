@@ -21,8 +21,8 @@ async def start_command(client, message):
         "استخدم الأزرار أدناه للتحكم أو اكتب (تشغيل + اسم الأغنية):",
         reply_markup=InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("قناة السورس", url="https://t.me/YourChannel"),
-                InlineKeyboardButton("المطور", url="https://t.me/YourUser")
+                InlineKeyboardButton("قناة السورس", url="https://t.me/bbabb9"),
+                InlineKeyboardButton("المطور", url="https://t.me/u_k44")
             ],
             [
                 InlineKeyboardButton("أضف البوت لمجموعتك", url=f"https://t.me/{app.me.username}?startgroup=true")
