@@ -71,6 +71,49 @@ async def play_audio(client, message):
         
     except Exception as e:
         await m.edit(f"❌ حدث خطأ: {e}")
+        @app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
+async def play_audio(client, message):
+    query = message.matches[0].group(2)
+    m = await message.reply_text("🔎 **جاري البحث...**")
+    
+    try:
+        # 1. البحث وجلب البيانات (هذا الجزء موجود عندك)
+        search = VideosSearch(query, limit=1)
+        results = search.result()
+        video = results['result'][0]
+        url = video['link']
+        title = video['title']
+        thumb = video['thumbnails'][0]['url']
+        duration = video['duration']
+
+        # 2. تشغيل الصوت في المكالمة
+        await call_py.join_group_call(message.chat.id, MediaStream(url))
+        
+        # 3. هنا تضع الكود الجديد الخاص بك (بدلاً من الرد النصي القديم)
+        await m.delete() # حذف رسالة "جاري البحث"
+        await message.reply_photo(
+            photo=thumb,
+            caption=(
+                "**🎧 تم بدء التشغيل بنجاح**\n\n"
+                f"**📌 العنوان:** `{title}`\n"
+                f"**⏳ المدة:** `{duration}`\n"
+                f"**🖇 الرابط:** [اضغط هنا]({url})\n"
+                f"**👤 طلب بواسطة:** {message.from_user.mention}\n\n"
+                "**👇 استخدم الأزرار أدناه للتحكم**"
+            ),
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⏸ مؤقت", callback_data="pause"),
+                    InlineKeyboardButton("▶️ استئناف", callback_data="resume")
+                ],
+                [
+                    InlineKeyboardButton("⏹ إيقاف النهائي", callback_data="stop")
+                ]
+            ])
+        )
+        
+    except Exception as e:
+        await m.edit(f"❌ حدث خطأ: {e}")
 
 @app.on_message(filters.text & filters.regex(r"^(ايقاف|توقف)$"))
 async def stop_audio_cmd(client, message):
