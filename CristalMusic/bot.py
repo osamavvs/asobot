@@ -1,7 +1,7 @@
 import asyncio
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+from pytgcalls.types import MediaStream  # التغيير هنا
 from yt_dlp import YoutubeDL
 from config import API_ID, API_HASH, BOT_TOKEN
 
@@ -19,15 +19,15 @@ async def play_audio(client, message):
     m = await message.reply_text(f"🔍 جاري البحث عن: `{query}`...")
     
     try:
-        # البحث في يوتيop
+        # البحث في يوتيوب
         info = ytdl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
         url = info['url']
         title = info['title']
         
-        # الانضمام للمكالمة وتشغيل الصوت
+        # الانضمام للمكالمة وتشغيل الصوت باستخدام التحديث الجديد MediaStream
         await call_py.join_group_call(
             message.chat.id,
-            AudioPiped(url)
+            MediaStream(url) # تم التغيير من AudioPiped إلى MediaStream
         )
         await m.edit(f"🎵 تم بدء التشغيل:\n**{title}**")
     except Exception as e:
@@ -44,7 +44,7 @@ async def stop_audio(client, message):
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 البوت والمحرك الصوتي جاهزان!")
+    print("🚀 البوت والمحرك الصوتي جاهزان بالنسخة المحدثة!")
     from pyrogram import idle
     await idle()
 
