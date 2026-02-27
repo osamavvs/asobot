@@ -1,5 +1,6 @@
 import asyncio
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import API_ID, API_HASH, BOT_TOKEN
 
 class Bot(Client):
@@ -13,28 +14,43 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
-        print("✅ البوت اشتغل بنجاح وهو الآن يستمع للأوامر!")
-
-    async def stop(self, *args):
-        await super().stop()
-        print("❌ تم إيقاف البوت.")
+        print("✅ البوت اشتغل! جرب اكتب: تشغيل اسم الاغنية")
 
 app = Bot()
 
-# --- قسم الأوامر ---
-
-@app.on_message(filters.command("start"))
-async def start_command(client, message):
+# --- أمر التشغيل بدون / (تشغيل + اسم الاغنية) ---
+@app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
+async def play_by_text(client, message):
+    # استخراج اسم الأغنية من الرسالة
+    query = message.matches[0].group(2)
+    
     await message.reply_text(
-        f"**أهلاً بك يا {message.from_user.mention} في بوت كرستال ميوزك!**\n\n"
-        "أنا أعمل الآن بنجاح، يمكنك البدء بإرسال الأوامر."
+        f"**🔍 جاري البحث عن:** `{query}`\n\n**يتم الآن التحضير للتشغيل...** 🎵",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏸ إيقاف مؤقت", callback_data="pause"),
+                InlineKeyboardButton("▶️ استئناف", callback_data="resume")
+            ],
+            [
+                InlineKeyboardButton("⏹ إيقاف نهائي", callback_data="stop")
+            ]
+        ])
     )
 
-@app.on_message(filters.command("help"))
-async def help_command(client, message):
-    await message.reply_text("قائمة الأوامر حالياً:\n/start - لبدء التشغيل\n/help - للمساعدة")
+# --- أمر الإيقاف بكلمة "ايقاف" بدون / ---
+@app.on_message(filters.text & filters.regex(r"^(ايقاف|توقف)$"))
+async def stop_by_text(client, message):
+    await message.reply_text("**تم إيقاف الموسيقى بنجاح!** ❌")
 
-# --- نهاية قسم الأوامر ---
+# --- معالجة ضغطات الأزرار (Callback) ---
+@app.on_callback_query()
+async def handle_buttons(client, query):
+    if query.data == "pause":
+        await query.answer("تم الإيقاف المؤقت ⏸", show_alert=True)
+    elif query.data == "resume":
+        await query.answer("تم الاستئناف ▶️")
+    elif query.data == "stop":
+        await query.edit_message_text("**تم إنهاء الجلسة وإيقاف الموسيقى.**")
 
 async def main():
     await app.start()
