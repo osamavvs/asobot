@@ -6,6 +6,7 @@ from pytgcalls.types.stream import StreamAudioQuality
 from youtubesearchpython import VideosSearch
 import yt_dlp
 from config import API_ID, API_HASH, BOT_TOKEN
+from config import API_ID, API_HASH, BOT_TOKEN
 
 app = Client("CrystalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call = PyTgCalls(app)
