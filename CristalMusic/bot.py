@@ -3,34 +3,39 @@ import pyrogram.errors
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream
-from yt_dlp import YoutubeDL
+from yt_search import SearchVideos
+import json
 from config import API_ID, API_HASH, BOT_TOKEN
 
-# تعريف الكائنات في النطاق العام (Global Scope) لضمان رؤيتها
+# تعريف الكائنات
 app = Client("CristalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
-# إعدادات البحث المتقدمة لتجاوز حماية يوتيوب
-ytdl_opts = {
-    "format": "bestaudio/best",
-    "quiet": True,
-    "no_warnings": True,
-    "default_search": "ytsearch",
-    "source_address": "0.0.0.0", # يساعد في تجنب حظر الآي بي على هيروكو
-    "nocheckcertificate": True,
-}
-ytdl = YoutubeDL(ytdl_opts)
 # --- قسم الأوامر ---
 @app.on_message(filters.text & filters.regex(r"^(تشغيل|شغل)\s+(.*)"))
 async def play_audio(client, message):
     query = message.matches[0].group(2)
     m = await message.reply_text(f"🔍 جاري البحث عن: `{query}`...")
+    
     try:
-        info = ytdl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
-        url = info['url']
-        title = info['title']
-        await call_py.join_group_call(message.chat.id, MediaStream(url))
-        await m.edit(f"🎵 تم بدء التشغيل:\n**{title}**")
+        # البحث باستخدام yt-search لتجاوز قيود يوتيوب
+        search = SearchVideos(query, offset=1, mode="json", max_results=1)
+        results = json.loads(search.result())
+        
+        if not results.get("search_result"):
+            return await m.edit("❌ لم يتم العثور على نتائج.")
+
+        video_data = results["search_result"][0]
+        url = video_data["link"]
+        title = video_data["title"]
+
+        # التشغيل في المكالمة
+        await call_py.join_group_call(
+            message.chat.id,
+            MediaStream(url)
+        )
+        await m.edit(f"🎵 **تم بدء التشغيل بنجاح**\n\n**🏷 العنوان:** {title}")
+        
     except Exception as e:
         await m.edit(f"❌ حدث خطأ: {e}")
 
@@ -38,14 +43,14 @@ async def play_audio(client, message):
 async def stop_audio(client, message):
     try:
         await call_py.leave_group_call(message.chat.id)
-        await message.reply_text("✅ تم إيقاف التشغيل.")
+        await message.reply_text("✅ تم إيقاف التشغيل ومغادرة المكالمة.")
     except:
-        await message.reply_text("❌ لا يوجد تشغيل حالياً.")
+        await message.reply_text("❌ لا يوجد تشغيل نشط حالياً.")
 
 # --- وظيفة التشغيل الرئيسية ---
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 البوت والمحرك الصوتي جاهزان للعمل!")
+    print("🚀 البوت جاهز والعزف بدأ!")
     from pyrogram import idle
     await idle()
