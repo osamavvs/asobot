@@ -1,0 +1,10 @@
+pyrogram
+tgcalls
+py-tgcalls
+motor
+pymongo
+requests
+yt-dlp
+ffmpeg-python
+python-dotenv
+beautifulsoup4
