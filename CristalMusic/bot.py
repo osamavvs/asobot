@@ -5,7 +5,10 @@ import json
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import UserNotParticipant
+# بدلاً من الاستدعاء القديم، استخدم هذا:
 from pytgcalls import PyTgCalls
+from pytgcalls.types import AudioPiped
+from pytgcalls.types import StreamAudioQuality # بدلاً من HighQualityAudio
 from pytgcalls.types import MediaStream
 from youtubesearchpython import VideosSearch
 from config import API_ID, API_HASH, BOT_TOKEN, OWNER_ID, OWNER_USER, CHANNEL_USER
