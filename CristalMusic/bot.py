@@ -2,7 +2,6 @@ import asyncio
 import yt_dlp
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-# الاستدعاء الصحيح للإصدارات الحديثة
 from pytgcalls import PyTgCalls
 from pytgcalls.types import AudioPiped
 from pytgcalls.types.stream import StreamAudioQuality
@@ -25,10 +24,8 @@ ydl_opts = {
 }
 
 async def force_sub_check(client, message):
-    if not FORCE_SUB:
-        return True
     try:
-        await client.get_chat_member(FORCE_SUB, message.from_user.id)
+        user = await client.get_chat_member(FORCE_SUB, message.from_user.id)
         return True
     except:
         await message.reply(
@@ -63,12 +60,12 @@ async def play(_, message):
 
     query = " ".join(message.command[1:])
     m = await message.reply("🔎 جاري البحث...")
-
+    
     try:
         audio, title = await get_audio(query)
         await call.join_group_call(
             message.chat.id,
-            AudioPiped(audio, StreamAudioQuality.HIGH) # تعديل الجودة هنا
+            AudioPiped(audio, StreamAudioQuality.HIGH)
         )
         await m.edit(f"▶️ تم تشغيل:\n{title}")
     except Exception as e:
