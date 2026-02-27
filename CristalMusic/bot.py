@@ -1,4 +1,5 @@
-from pyrogram import Client
+import asyncio
+from pyrogram import Client, filters
 from config import API_ID, API_HASH, BOT_TOKEN
 
 class Bot(Client):
@@ -12,7 +13,7 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
-        print("✅ البوت اشتغل بنجاح!")
+        print("✅ البوت اشتغل بنجاح وهو الآن يستمع للأوامر!")
 
     async def stop(self, *args):
         await super().stop()
@@ -20,12 +21,25 @@ class Bot(Client):
 
 app = Bot()
 
+# --- قسم الأوامر ---
+
+@app.on_message(filters.command("start"))
+async def start_command(client, message):
+    await message.reply_text(
+        f"**أهلاً بك يا {message.from_user.mention} في بوت كرستال ميوزك!**\n\n"
+        "أنا أعمل الآن بنجاح، يمكنك البدء بإرسال الأوامر."
+    )
+
+@app.on_message(filters.command("help"))
+async def help_command(client, message):
+    await message.reply_text("قائمة الأوامر حالياً:\n/start - لبدء التشغيل\n/help - للمساعدة")
+
+# --- نهاية قسم الأوامر ---
+
 async def main():
     await app.start()
-    # هنا يتم إضافة سطور إضافية لتشغيل الـ plugins
     from pyrogram import idle
     await idle()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
