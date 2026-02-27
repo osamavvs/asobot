@@ -1,0 +1,6 @@
+pyrogram==2.0.106
+tgcrypto
+https://github.com/pytgcalls/pytgcalls/archive/master.zip
+youtube-search-python
+yt-dlp
+httpx==0.24.1
