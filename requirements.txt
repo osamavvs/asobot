@@ -6,4 +6,3 @@ yt-dlp
 httpx==0.24.1
 requests
 ffmpeg-python
-httpx==0.24.1
