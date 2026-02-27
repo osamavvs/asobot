@@ -9,12 +9,12 @@ from pytgcalls.types import MediaStream
 from youtubesearchpython import VideosSearch
 from config import API_ID, API_HASH, BOT_TOKEN
 
-# --- الإعدادات ---
-OWNER_ID = 8074717568  # الأيدي الخاص بك
+# --- الإعدادات الأساسية ---
+OWNER_ID = 8074717568 
 app = Client("CristalMusic", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 call_py = PyTgCalls(app)
 
-# --- نظام الملفات (إحصائيات وحظر) ---
+# --- نظام الملفات ---
 STATS_FILE = "stats.json"
 BANNED_FILE = "banned.json"
 
@@ -27,102 +27,95 @@ def load_data(file, default):
 def save_data(file, data):
     with open(file, "w") as f: json.dump(data, f)
 
-# تحضير البيانات
-stats = load_data(STATS_FILE, {"users": [], "groups": [], "channels": []})
+stats = load_data(STATS_FILE, {"users": [], "groups": []})
 banned_users = load_data(BANNED_FILE, [])
 
-# --- فحص الحظر ---
-async def is_banned(_, __, message):
-    return message.from_user.id in banned_users
+# --- إعدادات المستخرج (الحل السحري للتشغيل) ---
+YDL_OPTIONS = {
+    "format": "bestaudio/best",
+    "quiet": True,
+    "no_warnings": True,
+    "nocheckcertificate": True,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "geo_bypass": True,
+}
 
-banned_filter = filters.create(is_banned)
+# --- نظام التشغيل المستقر ---
+@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)\s+(.*)"))
+async def play_handler(client, message):
+    # منع المحظورين
+    if message.from_user.id in banned_users:
+        return await message.reply_text("🚫 أنت محظور من استخدام البوت.")
+
+    # تحديث الإحصائيات
+    chat_id = message.chat.id
+    if str(chat_id) not in stats["groups"] and message.chat.type != "private":
+        stats["groups"].append(str(chat_id))
+        save_data(STATS_FILE, stats)
+
+    query = message.matches[0].group(2)
+    m = await message.reply_text("🔎 **جاري البحث والتحميل بأقصى سرعة...**")
+
+    try:
+        # البحث عن الفيديو
+        search = VideosSearch(query, limit=1)
+        res = search.result()['result'][0]
+        video_url = res['link']
+        title = res['title']
+        thumb = res['thumbnails'][0]['url']
+
+        # استخراج رابط الصوت الخام (Direct Stream)
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            audio_url = info['url']
+
+        # محاولة الانضمام للمكالمة وتشغيل الصوت
+        try:
+            await call_py.join_group_call(
+                chat_id, 
+                MediaStream(audio_url)
+            )
+        except Exception as e:
+            return await m.edit(f"❌ **تأكد من فتح المكالمة الصوتية أولاً!**\nالسبب: `{e}`")
+
+        await m.delete()
+        await message.reply_photo(
+            photo=thumb,
+            caption=f"**✅ تم التشغيل بنجاح**\n\n**📌 العنوان:** `{title}`\n**👤 بواسطة:** {message.from_user.mention}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⏸ مؤقت", callback_data="pause"), InlineKeyboardButton("▶️ استئناف", callback_data="resume")],
+                [InlineKeyboardButton("⏹ إيقاف", callback_data="stop")]
+            ])
+        )
+
+    except Exception as e:
+        await m.edit(f"⚠️ **حدث خطأ أثناء التشغيل:**\nربما يوتيوب قام بحظر السيرفر مؤقتاً.\nالسبب: `{e}`")
 
 # --- لوحة التحكم ---
 @app.on_message(filters.regex("^التحكم$") & filters.user(OWNER_ID))
 async def admin_panel(client, message):
-    u_count = len(stats["users"])
-    g_count = len(stats["groups"])
-    b_count = len(banned_users)
-    
     await message.reply_text(
-        f"**📊 لوحة تحكم المطور Cristal**\n\n"
-        f"**👥 المستخدمين:** `{u_count}`\n"
-        f"**🏘 المجموعات:** `{g_count}`\n"
-        f"**🚫 المحظورين:** `{b_count}`\n\n"
-        "**الأوامر المتاحة:**\n"
-        "• `حظر + الايدي` : لحظر عضو\n"
-        "• `الغاء حظر + الايدي` : لفك حظر عضو",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 تحديث الإحصائيات", callback_data="refresh_stats")],
-            [InlineKeyboardButton("📜 قائمة المحظورين", callback_data="show_banned")]
-        ])
+        f"📊 **إحصائيات Cristal:**\n\n👥 مستخدمين: `{len(stats['users'])}`\n🏘 مجموعات: `{len(stats['groups'])}`",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 تحديث", callback_data="refresh")]])
     )
 
-# --- أوامر الحظر وفك الحظر ---
-@app.on_message(filters.regex(r"^حظر (\d+)") & filters.user(OWNER_ID))
-async def ban_user(client, message):
-    user_id = int(message.matches[0].group(1))
-    if user_id not in banned_users:
-        banned_users.append(user_id)
-        save_data(BANNED_FILE, banned_users)
-        await message.reply_text(f"✅ تم حظر المستخدم `{user_id}` بنجاح.")
-    else:
-        await message.reply_text("⚠️ هذا المستخدم محظور بالفعل.")
-
-@app.on_message(filters.regex(r"^الغاء حظر (\d+)") & filters.user(OWNER_ID))
-async def unban_user(client, message):
-    user_id = int(message.matches[0].group(1))
-    if user_id in banned_users:
-        banned_users.remove(user_id)
-        save_data(BANNED_FILE, banned_users)
-        await message.reply_text(f"✅ تم فك حظر المستخدم `{user_id}`.")
-    else:
-        await message.reply_text("⚠️ هذا المستخدم ليس في قائمة الحظر.")
-
-# --- نظام التشغيل (يمنع المحظورين) ---
-@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)\s+(.*)") & ~banned_filter)
-async def play_handler(client, message):
-    # تحديث الإحصائيات
-    cid = str(message.chat.id)
-    if message.chat.type == "private" and cid not in stats["users"]:
-        stats["users"].append(cid)
-    elif message.chat.type in ["group", "supergroup"] and cid not in stats["groups"]:
-        stats["groups"].append(cid)
-    save_data(STATS_FILE, stats)
-
-    query = message.matches[0].group(2)
-    m = await message.reply_text("🔎 **جاري البحث...**")
-    
-    try:
-        search = VideosSearch(query, limit=1)
-        res = search.result()['result'][0]
-        video_url = res['link']
-        
-        with yt_dlp.YoutubeDL({"format": "bestaudio[ext=m4a]", "quiet": True}) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            audio_url = info['url']
-
-        await call_py.join_group_call(message.chat.id, MediaStream(audio_url))
-        await m.edit(f"✅ **بدأ التشغيل:**\n`{res['title']}`")
-    except Exception as e:
-        await m.edit(f"❌ خطأ: `{e}`")
-
-# رسالة للمحظورين
-@app.on_message(filters.text & filters.regex(r"^(شغل|تشغيل)") & banned_filter)
-async def banned_msg(client, message):
-    await message.reply_text("🚫 **عذراً، لقد تم حظرك من استخدام البوت من قبل المطور.**")
-
+# --- معالجة الأزرار ---
 @app.on_callback_query()
 async def cb_handler(client, query):
-    if query.data == "refresh_stats":
-        await query.answer("تم التحديث ✅")
-    elif query.data == "show_banned":
-        await query.answer(f"عدد المحظورين: {len(banned_users)}", show_alert=True)
+    if query.data == "stop":
+        await call_py.leave_group_call(query.message.chat.id)
+        await query.message.delete()
+    elif query.data == "pause":
+        await call_py.pause_stream(query.message.chat.id)
+        await query.answer("تم الإيقاف المؤقت")
+    elif query.data == "resume":
+        await call_py.resume_stream(query.message.chat.id)
+        await query.answer("تم الاستئناف")
 
 async def main():
     await app.start()
     await call_py.start()
-    print("🚀 Cristal Music with Ban System Online!")
+    print("🚀 البوت يعمل الآن بأفضل نسخة مستقرة!")
     from pyrogram import idle
     await idle()
 
