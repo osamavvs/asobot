@@ -1,6 +1,6 @@
 pyrogram==2.0.106
 tgcrypto
-pytgcalls==2.0.0rc10
+pytgcalls==2.0.0.post1
 youtube-search-python
 yt-dlp
 httpx==0.24.1
