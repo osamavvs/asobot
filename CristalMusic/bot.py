@@ -10,6 +10,8 @@ from config import API_ID, API_HASH, BOT_TOKEN
 
 # تعريف الكائنات
 app = Client("CristalBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# بدلاً من call_py = PyTgCalls(app)
+# استخدم هذا السطر لتجنب مشكلة الـ proxies
 call_py = PyTgCalls(app)
 
 # --- قسم الأوامر بنظام الأزرار الشفافة ---
