@@ -1,16 +1,16 @@
 from pyrogram import Client
 from config import API_ID, API_HASH, BOT_TOKEN
 
-# استدعاء المكتبة بطريقة ذكية لتجنب خطأ الـ ImportError
+# محاولة الاستدعاء بأكثر من طريقة لضمان التوافق مع أي نسخة مثبتة
 try:
-    # الطريقة الحديثة (v3)
+    # الطريقة للنسخ الحديثة جداً (v3+)
     from pytgcalls.pytgcalls import PyTgCalls
 except ImportError:
     try:
-        # الطريقة التقليدية (v2)
+        # الطريقة للنسخ المستقرة (v2)
         from pytgcalls import PyTgCalls
     except ImportError:
-        # في حال فشل كل شيء، نستخدم استدعاءً مباشراً
+        # حل أخير في حال فشل الاستدعاء المباشر
         import pytgcalls
         PyTgCalls = pytgcalls.PyTgCalls
 
