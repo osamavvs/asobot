@@ -1,6 +1,12 @@
-import asyncio
-import importlib
+import sys
+import pyrogram.errors
+
+# إضافة الخطأ الناقص يدوياً إلى مكتبة بايروجرام قبل تحميل أي شيء آخر
+if not hasattr(pyrogram.errors, "GroupcallForbidden"):
+    setattr(pyrogram.errors, "GroupcallForbidden", type("GroupcallForbidden", (Exception,), {}))
+
 from CristalMusic.bot import main
+import asyncio
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
